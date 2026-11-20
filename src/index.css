@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+    font-family: 'Noto Sans Thai', 'Sarabun', -apple-system, BlinkMacSystemFont,
+      'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: #111827;
+    background-color: #F3F7F4;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+.skeleton {
+  display: block;
+  background-color: #E2EBE5;
+  user-select: none;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

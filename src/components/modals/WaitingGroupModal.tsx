@@ -1,15 +1,37 @@
 /**
  * ============================================================================
- * SRC/COMPONENTS/MODALS/WAITINGGROUPMODAL.TSX — Add Waiting Queue Group
+ * SRC/COMPONENTS/MODALS/WAITINGGROUPMODAL.TSX — Modern Waiting Queue Modal
  * ============================================================================
  */
 
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { Check, DoorOpen, MessageSquare, UserCheck, Users, X } from 'lucide-react';
 import { useAppContext } from '../../hooks/useAppContext';
 import { useToast } from '../../hooks/useToast';
 import { apiService } from '../../services/apiClient';
 import { WaitingRoomType } from '../../types/database';
+
+const ROOM_TYPE_OPTIONS: Array<{
+  value: WaitingRoomType;
+  title: string;
+  subtitle: string;
+}> = [
+  {
+    value: 'ANY',
+    title: 'ห้องใดก็ได้ที่ว่างก่อน',
+    subtitle: 'ชั้น 3 หรือ ชั้น 5 (เรียกคิวเร็วที่สุด)'
+  },
+  {
+    value: 'SMALL_MEETING',
+    title: 'ชั้น 3 · ห้องประชุมเล็ก',
+    subtitle: 'เหมาะสำหรับกลุ่ม 3–6 คน'
+  },
+  {
+    value: 'MEETING',
+    title: 'ชั้น 5 · ห้องประชุมใหญ่',
+    subtitle: 'เหมาะสำหรับกลุ่มขนาดใหญ่ 6–10 คน'
+  }
+];
 
 export const WaitingGroupModal: React.FC = () => {
   const {
@@ -65,97 +87,140 @@ export const WaitingGroupModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="waitingModalTitle"
-      className="fixed inset-0 bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4 z-[210]"
+      onClick={() => !isSubmitting && closeWaitingModal()}
+      className="fixed inset-0 bg-slate-950/55 backdrop-blur-sm flex items-center justify-center p-4 z-[210]"
     >
-      <div className="bg-surface rounded-2xl w-full max-w-[440px] flex flex-col shadow-2xl border border-line overflow-hidden">
-        <div className="px-6 py-4 border-b border-line flex items-center justify-between">
-          <h3 id="waitingModalTitle" className="text-[17px] font-bold text-ink">
-            เพิ่มกลุ่มนักศึกษารอใช้ห้อง
-          </h3>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-surface rounded-[24px] w-full max-w-[460px] flex flex-col shadow-2xl border border-line overflow-hidden max-h-[92vh]"
+      >
+        {/* Forest Green Header */}
+        <div className="bg-gradient-to-r from-[#144D32] to-[#1E7548] px-6 py-5 text-white flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center text-white shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 id="waitingModalTitle" className="text-[19px] font-bold text-white leading-tight">
+                เพิ่มกลุ่มนักศึกษารอใช้ห้อง
+              </h3>
+              <p className="text-[13px] text-[#C6E5D3] mt-0.5">
+                ออกหมายเลขคิวอัตโนมัติ (เช่น Q-001) เพื่อเรียกเมื่อห้องว่าง
+              </p>
+            </div>
+          </div>
           <button
             type="button"
             onClick={closeWaitingModal}
-            className="w-8 h-8 rounded-full border border-line flex items-center justify-center text-ink-secondary hover:bg-subtle"
+            className="w-9 h-9 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors shrink-0"
             aria-label="ปิดหน้าต่าง"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="overflow-y-auto">
+          <div className="p-6 space-y-5">
+            {/* Representative Student ID */}
             <div>
               <label
                 htmlFor="waitRepStudentId"
-                className="block text-[13.5px] font-semibold text-ink mb-1.5"
+                className="flex items-center gap-1.5 text-[14px] font-bold text-ink mb-1.5"
               >
-                รหัสนักศึกษาตัวแทนกลุ่ม (1 คน) *
+                <UserCheck className="w-4 h-4 text-primary" />
+                <span>รหัสนักศึกษาตัวแทนกลุ่ม (1 คน)</span>
+                <span className="text-danger">*</span>
               </label>
               <input
                 id="waitRepStudentId"
                 type="text"
                 value={repStudentId}
                 onChange={(e) => setRepStudentId(e.target.value)}
-                placeholder="สแกนบัตรหรือกรอกรหัสนักศึกษาตัวแทน"
+                placeholder="สแกนบัตร หรือ กรอกรหัสนักศึกษา เช่น 6612732101"
                 required
-                className="w-full h-10 px-3.5 rounded-lg border border-line-strong bg-surface text-sm text-ink focus:outline-none focus:border-primary"
+                className="w-full h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all"
               />
-              <span className="block text-xs text-ink-secondary mt-1">
-                ระบบจะสร้างรหัสคิวอัตโนมัติ (เช่น Q-001) และป้องกันรหัสตัวแทนซ้ำในคิวที่กำลังรอ
-              </span>
             </div>
 
+            {/* Room Type Visual Radio Cards */}
             <div>
-              <label
-                htmlFor="waitRoomType"
-                className="block text-[13.5px] font-semibold text-ink mb-1.5"
-              >
-                ประเภทห้องที่ต้องการรอ (`room_type`) *
-              </label>
-              <select
-                id="waitRoomType"
-                value={roomType}
-                onChange={(e) => setRoomType(e.target.value as WaitingRoomType)}
-                className="w-full h-10 px-3.5 rounded-lg border border-line-strong bg-surface text-sm text-ink focus:outline-none focus:border-primary"
-              >
-                <option value="ANY">ห้องใดก็ได้ที่ว่างก่อน (ชั้น 3 หรือ ชั้น 5)</option>
-                <option value="SMALL_MEETING">
-                  เฉพาะชั้น 3 - ห้องประชุมเล็ก (6 ห้อง)
-                </option>
-                <option value="MEETING">เฉพาะชั้น 5 - ห้องประชุม (4 ห้อง)</option>
-              </select>
+              <div className="flex items-center gap-1.5 text-[14px] font-bold text-ink mb-2">
+                <DoorOpen className="w-4 h-4 text-primary" />
+                <span>เลือกประเภทห้องที่ต้องการรอ</span>
+                <span className="text-danger">*</span>
+              </div>
+              <div className="space-y-2">
+                {ROOM_TYPE_OPTIONS.map((opt) => {
+                  const active = roomType === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRoomType(opt.value)}
+                      className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all flex items-center justify-between gap-3 ${
+                        active
+                          ? 'border-primary bg-primary-light/60'
+                          : 'border-line bg-surface hover:border-line-strong hover:bg-subtle/60'
+                      }`}
+                    >
+                      <div>
+                        <div className={`text-[14.5px] font-bold ${active ? 'text-primary' : 'text-ink'}`}>
+                          {opt.title}
+                        </div>
+                        <div className="text-[12.5px] text-ink-secondary mt-0.5">
+                          {opt.subtitle}
+                        </div>
+                      </div>
+                      <span
+                        className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                          active
+                            ? 'bg-primary text-white'
+                            : 'border-2 border-line-strong bg-surface'
+                        }`}
+                      >
+                        {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
+            {/* Optional Note */}
             <div>
               <label
                 htmlFor="waitNote"
-                className="block text-[13.5px] font-semibold text-ink mb-1.5"
+                className="flex items-center gap-1.5 text-[14px] font-bold text-ink mb-1.5"
               >
-                หมายเหตุเพิ่มเติม (ถ้ามี)
+                <MessageSquare className="w-4 h-4 text-primary" />
+                <span>หมายเหตุเพิ่มเติม</span>
+                <span className="text-ink-muted font-normal text-[13px]">(ไม่บังคับ)</span>
               </label>
               <input
                 id="waitNote"
                 type="text"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="เช่น เบอร์ติดต่อ หรือรายละเอียดเพิ่มเติม"
-                className="w-full h-10 px-3.5 rounded-lg border border-line-strong bg-surface text-sm text-ink focus:outline-none focus:border-primary"
+                placeholder="เช่น เบอร์โทรติดต่อ หรือ จำนวนสมาชิกในกลุ่ม"
+                className="w-full h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] text-ink focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/15 transition-all"
               />
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t border-line bg-subtle flex items-center justify-end gap-2.5">
+          {/* Balanced 2-column footer */}
+          <div className="px-6 py-4 border-t border-line bg-subtle/60 grid grid-cols-2 gap-3">
             <button
               type="button"
               onClick={closeWaitingModal}
-              className="h-10 px-4 rounded-lg border border-line-strong bg-surface text-sm font-semibold text-ink hover:bg-slate-100"
+              disabled={isSubmitting}
+              className="h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] font-semibold text-ink hover:bg-subtle transition-colors"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="h-10 px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-60"
+              className="h-11 px-4 rounded-xl bg-primary text-white text-[15px] font-bold hover:bg-primary-hover shadow-sm disabled:opacity-60 transition-colors"
             >
               {isSubmitting ? 'กำลังบันทึกคิว...' : 'บันทึกเข้าคิวรอ'}
             </button>

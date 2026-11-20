@@ -6,45 +6,37 @@
  */
 
 import React from 'react';
-import { Menu } from 'lucide-react';
 import { useAppContext } from '../../hooks/useAppContext';
 
-interface TopbarProps {
-  onToggleMobileMenu: () => void;
-}
-
-export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileMenu }) => {
+export const Topbar: React.FC = () => {
   const { isOnline } = useAppContext();
 
   return (
-    <header className="lg:hidden bg-sidebar-bg text-white px-5 pt-5 pb-6 rounded-b-[28px] sticky top-0 z-[80] shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+    <header className="lg:hidden bg-gradient-to-r from-[#144D32] to-[#1A6340] text-white px-4 pt-4 pb-4 rounded-b-[24px] sticky top-0 z-[80] shadow-md">
+      <div className="flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-3 min-w-0">
-          <button
-            type="button"
-            onClick={onToggleMobileMenu}
-            className="w-11 h-11 rounded-xl bg-white/15 flex items-center justify-center text-white shrink-0"
-            aria-label="เปิดเมนู"
-          >
-            <Menu className="w-6 h-6" />
-          </button>
+          <img
+            src="./sskru-logo.png"
+            alt="โลโก้ มรภ.ศรีสะเกษ"
+            className="w-10 h-10 rounded-xl bg-white p-0.5 object-contain shrink-0 shadow-sm"
+          />
           <div className="min-w-0">
-            <div className="text-[13px] text-[#A8CDB8] truncate">
-              เคาน์เตอร์ · ห้องสมุด มรภ.ศรีสะเกษ
+            <div className="text-[11.5px] text-[#A8CDB8] truncate">
+              ห้องสมุด มรภ.ศรีสะเกษ
             </div>
-            <h1 className="text-[24px] font-bold text-white leading-tight truncate">
-              ห้องประชุม
+            <h1 className="text-[19px] font-bold text-white leading-tight truncate">
+              SSKRU Library
             </h1>
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/15 text-[13px] font-semibold text-white shrink-0">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 text-[12px] font-semibold text-white shrink-0">
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
+            className={`w-2 h-2 rounded-full ${
               isOnline ? 'bg-[#4ADE80]' : 'bg-red-400'
             }`}
           />
-          <span>{isOnline ? 'เซนเซอร์ปกติ' : 'ออฟไลน์'}</span>
+          <span>{isOnline ? 'ปกติ' : 'ออฟไลน์'}</span>
         </div>
       </div>
     </header>

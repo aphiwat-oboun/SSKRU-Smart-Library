@@ -28,6 +28,7 @@ export const RoomDetailModal: React.FC = () => {
     dashboardData,
     openStartSessionModal,
     openConfirmModal,
+    optimisticUpdateRoom,
     refreshDashboard
   } = useAppContext();
   const { showToast } = useToast();
@@ -123,21 +124,40 @@ export const RoomDetailModal: React.FC = () => {
       confirmLabel: 'รับกุญแจคืนแล้ว',
       variant: 'success',
       onConfirm: () => {
+        const targetRoomId = activeRoomDetailId;
+        roomDetailCache.delete(targetRoomId);
+        const rollback = optimisticUpdateRoom(
+          targetRoomId,
+          (r) => ({
+            ...r,
+            room_status: 'AVAILABLE',
+            effective_status: 'AVAILABLE',
+            current_session_id: '',
+            session_start_time: '',
+            expected_end_time: '',
+            elapsed_seconds: 0,
+            active_member_count: 0,
+            has_entered: false,
+            presence_state: 'EMPTY'
+          }),
+          { roomName, type: 'SESSION_END' }
+        );
+        closeRoomDetailModal();
+        showToast(`รับคืนกุญแจ ${roomName} เรียบร้อยแล้ว`, 'success');
+
         apiService
           .endRoomSession(targetSessionId, 'NORMAL_CHECKOUT')
-          .then(async (res) => {
-            roomDetailCache.delete(activeRoomDetailId);
-            closeRoomDetailModal();
-            showToast(`รับคืนกุญแจ ${roomName} เรียบร้อยแล้ว`, 'success');
+          .then((res) => {
             if (res.nextWaitingGroup) {
               showToast(
                 `มีคิวรอถัดไป (${res.nextWaitingGroup.queue_number}) พร้อมเรียกเข้าใช้งาน!`,
                 'warning'
               );
             }
-            await refreshDashboard(false);
+            void refreshDashboard(false);
           })
           .catch((err) => {
+            rollback();
             showToast(
               err instanceof Error ? err.message : 'ไม่สามารถจบการใช้งานได้',
               'error'

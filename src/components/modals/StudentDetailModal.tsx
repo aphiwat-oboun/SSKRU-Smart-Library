@@ -1,12 +1,11 @@
 /**
  * ============================================================================
- * SRC/COMPONENTS/MODALS/STUDENTDETAILMODAL.TSX — Student Profile, Cards & History
- * Mandatory Skeleton Loading: StudentDetailSkeleton
+ * SRC/COMPONENTS/MODALS/STUDENTDETAILMODAL.TSX — Clean Professional Student Profile
  * ============================================================================
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { Award, Clock, GraduationCap, X } from 'lucide-react';
 import { useAppContext } from '../../hooks/useAppContext';
 import { apiService } from '../../services/apiClient';
 import { StudentDetailResponse } from '../../types/api';
@@ -17,6 +16,24 @@ import {
 import { ErrorState } from '../common/StateBoxes';
 import { StatusBadge } from '../common/StatusBadge';
 import { StudentDetailSkeleton } from '../skeleton/Skeletons';
+
+function translateCheckoutReason(reason?: string): string {
+  switch (reason) {
+    case 'SESSION_END':
+    case 'NORMAL_CHECKOUT':
+      return 'คืนกุญแจปกติ';
+    case 'EARLY_LEAVE':
+      return 'ออกก่อนเวลา';
+    case 'AUTO_EMPTY':
+      return 'ปิดรอบอัตโนมัติ';
+    case 'STAFF_FORCED':
+      return 'เจ้าหน้าที่ปิดรอบ';
+    case 'ACTIVE':
+      return 'กำลังใช้งาน';
+    default:
+      return 'คืนกุญแจปกติ';
+  }
+}
 
 export const StudentDetailModal: React.FC = () => {
   const { activeStudentDetailId, closeStudentDetailModal } = useAppContext();
@@ -53,7 +70,6 @@ export const StudentDetailModal: React.FC = () => {
   if (!activeStudentDetailId) return null;
 
   const stu = data?.student;
-  const cards = data?.cards || [];
   const history = data?.usageHistory || [];
 
   return (
@@ -61,21 +77,30 @@ export const StudentDetailModal: React.FC = () => {
       role="dialog"
       aria-modal="true"
       aria-labelledby="studentDetailModalTitle"
-      className="fixed inset-0 bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4 z-[200]"
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[200]"
     >
-      <div className="bg-surface rounded-2xl w-full max-w-[820px] max-h-[90vh] flex flex-col shadow-2xl border border-line overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-line flex items-center justify-between gap-4">
-          <h3 id="studentDetailModalTitle" className="text-[17px] font-bold text-ink">
-            ข้อมูลนักศึกษาและประวัติการใช้ห้องรายบุคคล
-          </h3>
+      <div className="bg-appbg rounded-[28px] w-full max-w-[820px] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+        {/* Forest Green Header */}
+        <div className="bg-sidebar-bg text-white px-6 py-5 rounded-b-[22px] flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-12 h-12 rounded-2xl bg-white/15 flex items-center justify-center text-[#6EE7B7] shrink-0">
+              <GraduationCap className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[13px] text-[#A8CDB8]">ข้อมูลนักศึกษาและประวัติการใช้ห้อง</div>
+              <h3 id="studentDetailModalTitle" className="text-[22px] font-bold leading-tight truncate">
+                {stu ? `${stu.student_name} (${stu.student_id})` : 'กำลังโหลดข้อมูล...'}
+              </h3>
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={closeStudentDetailModal}
-            className="w-8 h-8 rounded-full border border-line flex items-center justify-center text-ink-secondary hover:bg-subtle"
+            className="w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25 shrink-0"
             aria-label="ปิดหน้าต่าง"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -92,133 +117,107 @@ export const StudentDetailModal: React.FC = () => {
 
           {!isLoading && !errorMsg && stu && (
             <>
+              {/* Profile & Usage Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-subtle border border-line rounded-xl p-4">
-                  <div className="text-base font-bold text-ink mb-2">
-                    {stu.student_name} ({stu.student_id})
+                <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[18px] font-bold text-ink">ข้อมูลการศึกษา</span>
+                    <StatusBadge
+                      status={stu.student_status === 'ACTIVE' ? 'OCCUPIED' : 'DEVICE_OFFLINE'}
+                      customLabel={stu.student_status === 'ACTIVE' ? 'กำลังศึกษา' : stu.student_status}
+                    />
                   </div>
-                  <div className="text-[13.5px] text-slate-600 space-y-1">
+                  <div className="text-[15px] text-ink-secondary space-y-1.5 pt-1">
                     <div>
-                      <strong>คณะ:</strong> {stu.faculty_name} ({stu.faculty_id})
+                      <strong className="text-ink">รหัสนักศึกษา:</strong> {stu.student_id}
                     </div>
                     <div>
-                      <strong>สาขาวิชา:</strong> {stu.major_name} ({stu.major_id})
+                      <strong className="text-ink">ชั้นปี:</strong> ชั้นปีที่ {stu.student_year}
                     </div>
                     <div>
-                      <strong>ชั้นปี:</strong> ปีที่ {stu.student_year} (ปีที่เข้าศึกษา{' '}
-                      {stu.admission_year})
+                      <strong className="text-ink">คณะ:</strong> {stu.faculty_name}
                     </div>
-                    <div className="pt-1">
-                      <strong>สถานะ:</strong>{' '}
-                      <StatusBadge
-                        status={
-                          stu.student_status === 'ACTIVE'
-                            ? 'OCCUPIED'
-                            : 'DEVICE_OFFLINE'
-                        }
-                        customLabel={stu.student_status}
-                      />
+                    <div>
+                      <strong className="text-ink">สาขาวิชา:</strong> {stu.major_name}
                     </div>
                   </div>
                 </div>
 
-                <div className="bg-subtle border border-line rounded-xl p-4">
-                  <div className="text-[15px] font-bold text-ink mb-2">
-                    บัตรนักศึกษาที่ลงทะเบียน ({cards.length} ใบ)
-                  </div>
-                  {cards.length === 0 ? (
-                    <div className="text-[13px] text-ink-secondary">
-                      ยังไม่มีบัตรที่ผูกกับนักศึกษาคนนี้
+                <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm flex flex-col justify-between gap-3">
+                  <div className="text-[18px] font-bold text-ink">สรุปการใช้ห้องสะสม</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-primary-light rounded-xl p-4">
+                      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#144D32]">
+                        <Award className="w-4 h-4" />
+                        <span>จำนวนครั้ง</span>
+                      </div>
+                      <div className="text-[26px] font-bold text-primary mt-1">
+                        {history.length} ครั้ง
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {cards.map((c) => (
-                        <div
-                          key={c.card_id}
-                          className="flex items-center justify-between px-3 py-2 bg-surface border border-line rounded-lg text-xs"
-                        >
-                          <div>
-                            <strong>UID: {c.card_uid}</strong>{' '}
-                            <span className="text-ink-secondary">
-                              (ลงทะเบียน {formatDateTimeThai(c.registered_at)})
-                            </span>
-                          </div>
-                          <StatusBadge
-                            status={
-                              c.card_status === 'ACTIVE'
-                                ? 'OCCUPIED'
-                                : 'DEVICE_OFFLINE'
-                            }
-                            customLabel={c.card_status}
-                          />
-                        </div>
-                      ))}
+                    <div className="bg-subtle border border-line rounded-xl p-4">
+                      <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink-secondary">
+                        <Clock className="w-4 h-4" />
+                        <span>เวลารวม</span>
+                      </div>
+                      <div className="text-[22px] font-bold text-ink mt-1">
+                        {formatDurationHoursMinutes(data?.totalUsageSeconds || 0)}
+                      </div>
                     </div>
-                  )}
-                  <div className="mt-3 text-[13px] text-primary font-medium">
-                    <strong>รวมเวลาใช้ห้องสะสมทั้งหมด:</strong>{' '}
-                    {formatDurationHoursMinutes(data?.totalUsageSeconds || 0)} (
-                    {history.length} ครั้ง)
                   </div>
                 </div>
               </div>
 
-              <div>
-                <h4 className="text-[15px] font-bold text-ink mb-2.5">
-                  ประวัติการใช้ห้องรายบุคคล (คำนวณจากข้อมูลจริงใน Session_Members)
+              {/* Clean Usage History Table */}
+              <div className="bg-surface border border-line rounded-2xl p-5 shadow-sm">
+                <h4 className="text-[17px] font-bold text-ink mb-3">
+                  ประวัติการเข้าใช้ห้อง ({history.length} ครั้ง)
                 </h4>
-                <div className="w-full overflow-x-auto border border-line rounded-xl bg-surface">
-                  <table className="w-full border-collapse text-left text-sm">
+                <div className="w-full overflow-x-auto border border-line rounded-xl">
+                  <table className="w-full border-collapse text-left text-[15px]">
                     <thead>
-                      <tr className="bg-subtle text-ink-secondary text-xs font-semibold border-b border-line">
+                      <tr className="bg-subtle text-ink-secondary text-[14px] font-bold border-b border-line">
                         <th className="px-4 py-3">ห้องที่ใช้</th>
-                        <th className="px-4 py-3">รหัส Session</th>
-                        <th className="px-4 py-3">เวลาเข้า (Check-in)</th>
-                        <th className="px-4 py-3">เวลาออก (Check-out)</th>
-                        <th className="px-4 py-3">ระยะเวลาที่ใช้</th>
-                        <th className="px-4 py-3">สาเหตุการออก</th>
+                        <th className="px-4 py-3">เวลาเข้า</th>
+                        <th className="px-4 py-3">เวลาออก</th>
+                        <th className="px-4 py-3">ระยะเวลา</th>
+                        <th className="px-4 py-3">สถานะ</th>
                       </tr>
                     </thead>
                     <tbody>
                       {history.length === 0 ? (
                         <tr>
                           <td
-                            colSpan={6}
-                            className="px-4 py-6 text-center text-ink-secondary"
+                            colSpan={5}
+                            className="px-4 py-8 text-center text-[15px] text-ink-secondary"
                           >
-                            ยังไม่มีประวัติการเข้าใช้ห้องค้นคว้า
+                            ยังไม่มีประวัติการเข้าใช้ห้องประชุม
                           </td>
                         </tr>
                       ) : (
                         history.map((h) => (
                           <tr
                             key={h.member_id}
-                            className="border-b border-line last:border-b-0 hover:bg-slate-50"
+                            className="border-b border-line last:border-b-0 hover:bg-subtle/60"
                           >
-                            <td className="px-4 py-3 font-semibold">
+                            <td className="px-4 py-3.5 font-bold text-ink">
                               {h.room_name || h.room_id}
                             </td>
-                            <td className="px-4 py-3 text-xs font-mono">
-                              {h.session_id.substring(0, 8)}...
-                            </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3.5 text-ink">
                               {formatDateTimeThai(h.check_in_at)}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3.5 text-ink">
                               {h.check_out_at ? (
                                 formatDateTimeThai(h.check_out_at)
                               ) : (
-                                <StatusBadge
-                                  status="OCCUPIED"
-                                  customLabel="กำลังใช้งาน"
-                                />
+                                <StatusBadge status="OCCUPIED" customLabel="กำลังใช้งาน" />
                               )}
                             </td>
-                            <td className="px-4 py-3 font-semibold">
+                            <td className="px-4 py-3.5 font-bold text-primary">
                               {formatDurationHoursMinutes(h.usage_seconds)}
                             </td>
-                            <td className="px-4 py-3">
-                              {h.check_out_reason || '-'}
+                            <td className="px-4 py-3.5 text-ink-secondary font-medium">
+                              {translateCheckoutReason(h.check_out_reason)}
                             </td>
                           </tr>
                         ))
@@ -232,11 +231,11 @@ export const StudentDetailModal: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-line bg-subtle flex items-center justify-end">
+        <div className="px-6 py-4 border-t border-line bg-surface flex items-center justify-end">
           <button
             type="button"
             onClick={closeStudentDetailModal}
-            className="h-10 px-4 rounded-lg border border-line-strong bg-surface text-sm font-semibold text-ink hover:bg-slate-100"
+            className="h-11 px-6 rounded-xl bg-primary hover:bg-primary-hover text-white text-[15px] font-bold"
           >
             ปิดหน้าต่าง
           </button>

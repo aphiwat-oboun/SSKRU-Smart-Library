@@ -22,7 +22,7 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-[400] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
+      className="fixed bottom-24 left-4 right-4 lg:bottom-6 lg:right-6 lg:left-auto z-[400] flex flex-col gap-2 max-w-sm lg:w-full mx-auto lg:mx-0 pointer-events-none"
       aria-live="polite"
     >
       {toasts.map((t) => (

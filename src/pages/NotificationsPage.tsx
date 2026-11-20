@@ -1,17 +1,18 @@
 /**
  * ============================================================================
- * SRC/PAGES/NOTIFICATIONSPAGE.TSX — Clean Notification Management (PDF Page 3)
+ * SRC/PAGES/NOTIFICATIONSPAGE.TSX — Full-Width Balanced Notification Center
+ * Left 7 cols: Active alerts + history | Right 5 cols: Notification Toggles
  * ============================================================================
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { BellRing, CheckCircle2, RefreshCw, Volume2 } from 'lucide-react';
 import { EmptyState, ErrorState } from '../components/common/StateBoxes';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { TableRowsSkeleton } from '../components/skeleton/Skeletons';
 import { useAppContext } from '../hooks/useAppContext';
 import { useToast } from '../hooks/useToast';
-import { apiService } from '../services/apiClient';
+import { apiService, getCachedRpc } from '../services/apiClient';
 import { NotificationRecord } from '../types/database';
 import { formatDateTimeThai, formatTimeThai } from '../utils/formatters';
 
@@ -19,16 +20,42 @@ export const NotificationsPage: React.FC = () => {
   const { audio, dashboardData, refreshDashboard, openConfirmModal } = useAppContext();
   const { showToast } = useToast();
 
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const cachedNotifs = getCachedRpc<{ notifications: NotificationRecord[] }>('getNotificationsList');
+  const [notifications, setNotifications] = useState<NotificationRecord[]>(
+    cachedNotifs?.notifications || []
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(!cachedNotifs);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Simple local notification toggles matching PDF Page 3
-  const [warnBefore10Min, setWarnBefore10Min] = useState<boolean>(true);
-  const [warnOnlyWithQueue, setWarnOnlyWithQueue] = useState<boolean>(true);
+  const [warnBefore10Min, setWarnBefore10Min] = useState<boolean>(() => {
+    const saved = localStorage.getItem('SRRU_WARN_BEFORE_10M');
+    return saved === null ? true : saved === 'true';
+  });
+  const [warnOnlyWithQueue, setWarnOnlyWithQueue] = useState<boolean>(() => {
+    const saved = localStorage.getItem('SRRU_WARN_ONLY_QUEUE');
+    return saved === null ? true : saved === 'true';
+  });
+
+  const handleToggleWarn10Min = () => {
+    setWarnBefore10Min((prev) => {
+      const next = !prev;
+      localStorage.setItem('SRRU_WARN_BEFORE_10M', String(next));
+      return next;
+    });
+  };
+
+  const handleToggleWarnQueue = () => {
+    setWarnOnlyWithQueue((prev) => {
+      const next = !prev;
+      localStorage.setItem('SRRU_WARN_ONLY_QUEUE', String(next));
+      return next;
+    });
+  };
 
   const loadNotifications = useCallback(async () => {
-    setIsLoading(true);
+    if (!getCachedRpc('getNotificationsList')) {
+      setIsLoading(true);
+    }
     setErrorMsg(null);
     try {
       const res = await apiService.getNotificationsList();
@@ -104,24 +131,36 @@ export const NotificationsPage: React.FC = () => {
 
   const handleToggleCounterSound = () => {
     const next = audio.toggleSound();
-    showToast(next ? 'เปิดเสียงแจ้งเตือนที่เคาน์เตอร์แล้ว' : 'ปิดเสียงแจ้งเตือนที่เคาน์เตอร์แล้ว', 'info');
+    showToast(
+      next ? 'เปิดเสียงแจ้งเตือนที่เคาน์เตอร์แล้ว' : 'ปิดเสียงแจ้งเตือนที่เคาน์เตอร์แล้ว',
+      'info'
+    );
+  };
+
+  const handleTestSound = () => {
+    audio.unlockAudio();
+    audio.playAlertChime();
+    showToast('ทดสอบเสียงแจ้งเตือนเรียบร้อย', 'success');
   };
 
   return (
-    <div className="max-w-[920px] space-y-6">
-      {/* Header */}
+    <div className="space-y-6">
+      {/* Full-Width Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-bold text-ink leading-tight">แจ้งเตือน</h1>
-          <p className="text-[15px] text-ink-secondary mt-1">
-            ตรวจสอบการหมดเวลาห้องประชุม คิวรอ และจัดการการคืนกุญแจ
-          </p>
+        <div className="flex items-stretch gap-3.5">
+          <span className="w-1.5 rounded-full bg-primary shrink-0" />
+          <div>
+            <h1 className="text-[28px] font-bold text-ink leading-tight">การแจ้งเตือน</h1>
+            <p className="text-[15px] text-ink-secondary mt-1">
+              ตรวจสอบการหมดเวลาห้องประชุม คิวรอ และตั้งค่าการแจ้งเตือนที่เคาน์เตอร์
+            </p>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={() => void loadNotifications()}
-          className="h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] font-semibold text-ink hover:bg-subtle inline-flex items-center gap-2"
+          className="h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] font-bold text-ink hover:bg-subtle inline-flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" />
           <span>รีเฟรช</span>
@@ -134,78 +173,137 @@ export const NotificationsPage: React.FC = () => {
         <ErrorState message={errorMsg} onRetry={() => void loadNotifications()} />
       )}
 
-      {/* Unread Urgent Notification Cards (PDF Page 3 Style) */}
+      {/* Balanced Full-Width 2-Column Layout */}
       {!isLoading && !errorMsg && (
-        <div className="space-y-5">
-          {unreadList.length === 0 ? (
-            <div className="bg-surface border border-line rounded-[20px] p-6 shadow-sm flex items-center gap-3 text-primary font-bold text-[17px]">
-              <CheckCircle2 className="w-6 h-6 shrink-0" />
-              <span>ขณะนี้ไม่มีการแจ้งเตือนค้างในระบบ</span>
-            </div>
-          ) : (
-            unreadList.map((n) => (
-              <div
-                key={n.notification_id}
-                className="bg-surface border-2 border-warning-border rounded-[22px] p-6 shadow-sm space-y-5"
-              >
-                <div>
-                  <span className="inline-block px-3.5 py-1 rounded-full bg-warning-bg text-warning-text text-[13px] font-bold mb-2.5">
-                    {n.room_id ? `ห้อง ${n.room_id}` : 'แจ้งเตือนด่วน'} · {formatTimeThai(n.created_at)}
-                  </span>
-                  <h2 className="text-[22px] font-bold text-ink leading-snug">
-                    {n.title}
-                  </h2>
-                  <p className="text-[15px] text-ink-secondary mt-1">
-                    {n.message}
-                    {waitingCount > 0 ? ` · มีคิวรอ ${waitingCount} กลุ่ม` : ''}
-                  </p>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+          {/* Left Column (7 cols): Active Alerts + History */}
+          <div className="xl:col-span-7 space-y-5">
+            {unreadList.length === 0 ? (
+              <div className="bg-surface border border-line rounded-[24px] p-6 shadow-sm flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary-light text-primary flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-6 h-6" />
                 </div>
-
-                {/* 3 Clear Action Buttons (PDF Page 3) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => handleAlertInRoom(n)}
-                    className="h-12 px-4 rounded-xl bg-danger hover:bg-danger-hover text-white text-[15px] font-bold transition-colors"
-                  >
-                    แจ้งในห้อง (ไฟกะพริบ + เสียง)
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => void handleAcknowledgeOne(n.notification_id)}
-                    className="h-12 px-4 rounded-xl border-2 border-primary bg-surface text-primary hover:bg-primary-light text-[15px] font-bold transition-colors"
-                  >
-                    รับทราบแล้ว
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleReturnKeyForNotification(n)}
-                    className="h-12 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-[15px] font-bold transition-colors"
-                  >
-                    รับกุญแจคืนแล้ว
-                  </button>
+                <div>
+                  <div className="text-[19px] font-bold text-ink">
+                    ขณะนี้ไม่มีการแจ้งเตือนค้างในระบบ
+                  </div>
+                  <div className="text-[14.5px] text-ink-secondary">
+                    ห้องประชุมทุกห้องและอุปกรณ์เซนเซอร์อยู่ในสถานะปกติ
+                  </div>
                 </div>
               </div>
-            ))
-          )}
+            ) : (
+              unreadList.map((n) => (
+                <div
+                  key={n.notification_id}
+                  className="bg-surface border-2 border-warning-border rounded-[24px] p-6 shadow-sm space-y-5"
+                >
+                  <div>
+                    <span className="inline-block px-3.5 py-1 rounded-full bg-warning-bg text-warning-text text-[13.5px] font-bold mb-2.5">
+                      {n.room_id ? `ห้อง ${n.room_id}` : 'แจ้งเตือนด่วน'} · {formatTimeThai(n.created_at)}
+                    </span>
+                    <h2 className="text-[22px] font-bold text-ink leading-snug">
+                      {n.title}
+                    </h2>
+                    <p className="text-[15.5px] text-ink-secondary mt-1">
+                      {n.message}
+                      {waitingCount > 0 ? ` · มีคิวรอ ${waitingCount} กลุ่ม` : ''}
+                    </p>
+                  </div>
 
-          {/* Notification Settings Card (Matches PDF Page 3) */}
-          <div className="bg-surface border border-line rounded-[22px] p-6 shadow-sm">
-            <h2 className="text-[19px] font-bold text-ink mb-4">ตั้งค่าแจ้งเตือน</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleAlertInRoom(n)}
+                      className="h-12 px-4 rounded-xl bg-danger hover:bg-danger-hover text-white text-[15px] font-bold transition-colors"
+                    >
+                      แจ้งในห้อง (ไฟ + เสียง)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => void handleAcknowledgeOne(n.notification_id)}
+                      className="h-12 px-4 rounded-xl border-2 border-primary bg-surface text-primary hover:bg-primary-light text-[15px] font-bold transition-colors"
+                    >
+                      รับทราบแล้ว
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleReturnKeyForNotification(n)}
+                      className="h-12 px-4 rounded-xl bg-primary hover:bg-primary-hover text-white text-[15px] font-bold transition-colors"
+                    >
+                      รับกุญแจคืนแล้ว
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {/* Past Notifications History */}
+            <div className="bg-surface border border-line rounded-[24px] p-6 shadow-sm">
+              <div className="flex items-center gap-2.5 mb-4">
+                <span className="w-1.5 h-5 rounded-full bg-primary inline-block" />
+                <h2 className="text-[19px] font-bold text-ink">
+                  ประวัติการแจ้งเตือน ({notifications.length})
+                </h2>
+              </div>
+
+              {notifications.length === 0 ? (
+                <EmptyState
+                  title="ยังไม่มีประวัติการแจ้งเตือน"
+                  description="เมื่อมีห้องครบเวลาหรือเลยเวลาปิด 16:00 น. ระบบจะบันทึกประวัติไว้ที่นี่"
+                />
+              ) : (
+                <div className="divide-y divide-line">
+                  {notifications.slice(0, 20).map((n) => (
+                    <div
+                      key={n.notification_id}
+                      className="py-4 flex flex-wrap items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-[16px] font-bold text-ink">
+                          {n.room_id ? `[${n.room_id}] ` : ''}
+                          {n.title}
+                        </div>
+                        <div className="text-[14.5px] text-ink-secondary mt-0.5">
+                          {n.message} · {formatDateTimeThai(n.created_at)}
+                        </div>
+                      </div>
+                      <StatusBadge
+                        status={n.notification_status === 'UNREAD' ? 'WARNING' : 'OCCUPIED'}
+                        customLabel={
+                          n.notification_status === 'UNREAD' ? 'ยังไม่รับทราบ' : 'รับทราบแล้ว'
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column (5 cols): Notification Settings Card */}
+          <div className="xl:col-span-5 bg-surface border border-line rounded-[24px] p-6 shadow-sm space-y-5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-1.5 h-5 rounded-full bg-primary inline-block" />
+              <h2 className="text-[20px] font-bold text-ink">ตั้งค่าการแจ้งเตือน</h2>
+            </div>
 
             <div className="divide-y divide-line">
-              <div className="py-3.5 flex items-center justify-between gap-4">
-                <span className="text-[16px] font-medium text-ink">
-                  เตือนก่อนหมด 10 นาที
-                </span>
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[16px] font-bold text-ink">เตือนก่อนหมด 10 นาที</div>
+                  <div className="text-[13.5px] text-ink-secondary">
+                    แจ้งเตือนล่วงหน้าก่อนครบกำหนดเวลาใช้งาน
+                  </div>
+                </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={warnBefore10Min}
-                  onClick={() => setWarnBefore10Min((v) => !v)}
-                  className={`w-14 h-8 rounded-full p-1 transition-colors ${
+                  onClick={handleToggleWarn10Min}
+                  className={`w-14 h-8 rounded-full p-1 transition-colors shrink-0 ${
                     warnBefore10Min ? 'bg-primary' : 'bg-slate-300'
                   }`}
                 >
@@ -217,16 +315,19 @@ export const NotificationsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="py-3.5 flex items-center justify-between gap-4">
-                <span className="text-[16px] font-medium text-ink">
-                  เตือนเฉพาะเมื่อมีคิวรอ
-                </span>
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[16px] font-bold text-ink">เตือนเฉพาะเมื่อมีคิวรอ</div>
+                  <div className="text-[13.5px] text-ink-secondary">
+                    หากไม่มีกลุ่มรอคิว ให้ใช้ต่อได้จนถึง 16:00 น.
+                  </div>
+                </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={warnOnlyWithQueue}
-                  onClick={() => setWarnOnlyWithQueue((v) => !v)}
-                  className={`w-14 h-8 rounded-full p-1 transition-colors ${
+                  onClick={handleToggleWarnQueue}
+                  className={`w-14 h-8 rounded-full p-1 transition-colors shrink-0 ${
                     warnOnlyWithQueue ? 'bg-primary' : 'bg-slate-300'
                   }`}
                 >
@@ -238,16 +339,19 @@ export const NotificationsPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="py-3.5 flex items-center justify-between gap-4">
-                <span className="text-[16px] font-medium text-ink">
-                  เสียงที่เคาน์เตอร์
-                </span>
+              <div className="py-4 flex items-center justify-between gap-4">
+                <div>
+                  <div className="text-[16px] font-bold text-ink">เสียงเตือนที่เคาน์เตอร์</div>
+                  <div className="text-[13.5px] text-ink-secondary">
+                    ส่งเสียงกระดิ่งเมื่อมีการแจ้งเตือนใหม่เข้ามา
+                  </div>
+                </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={audio.soundEnabled}
                   onClick={handleToggleCounterSound}
-                  className={`w-14 h-8 rounded-full p-1 transition-colors ${
+                  className={`w-14 h-8 rounded-full p-1 transition-colors shrink-0 ${
                     audio.soundEnabled ? 'bg-primary' : 'bg-slate-300'
                   }`}
                 >
@@ -259,47 +363,20 @@ export const NotificationsPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleTestSound}
+              className="w-full h-12 rounded-xl border-2 border-primary text-primary hover:bg-primary-light text-[15px] font-bold inline-flex items-center justify-center gap-2 transition-colors"
+            >
+              {audio.soundEnabled ? (
+                <Volume2 className="w-5 h-5" />
+              ) : (
+                <BellRing className="w-5 h-5" />
+              )}
+              <span>ทดสอบเสียงแจ้งเตือน</span>
+            </button>
           </div>
-
-          {/* Past Notifications History */}
-          {notifications.length > 0 && (
-            <div className="bg-surface border border-line rounded-[22px] p-6 shadow-sm">
-              <h2 className="text-[18px] font-bold text-ink mb-4">
-                ประวัติการแจ้งเตือนทั้งหมด ({notifications.length})
-              </h2>
-              <div className="divide-y divide-line">
-                {notifications.slice(0, 20).map((n) => (
-                  <div
-                    key={n.notification_id}
-                    className="py-3.5 flex flex-wrap items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[15px] font-bold text-ink">
-                        {n.room_id ? `[${n.room_id}] ` : ''}
-                        {n.title}
-                      </div>
-                      <div className="text-[14px] text-ink-secondary">
-                        {n.message} · {formatDateTimeThai(n.created_at)}
-                      </div>
-                    </div>
-                    <StatusBadge
-                      status={n.notification_status === 'UNREAD' ? 'WARNING' : 'OCCUPIED'}
-                      customLabel={
-                        n.notification_status === 'UNREAD' ? 'ยังไม่รับทราบ' : 'รับทราบแล้ว'
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {notifications.length === 0 && (
-            <EmptyState
-              title="ยังไม่มีประวัติการแจ้งเตือน"
-              description="เมื่อมีห้องครบเวลาหรือมีเหตุการณ์สำคัญ ระบบจะแสดงที่นี่ทันที"
-            />
-          )}
         </div>
       )}
     </div>

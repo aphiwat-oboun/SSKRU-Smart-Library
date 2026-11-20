@@ -24,6 +24,57 @@
   pointer-events: none;
 }
 
+/* Custom Modern Forest Green Scrollbar (Chrome, Edge, Safari, Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #A7C9B5 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #B4D3C0;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.15s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #1E7548;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Subtle translucent scrollbar inside the dark Forest Green Sidebar */
+aside * {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+aside ::-webkit-scrollbar {
+  width: 6px;
+}
+
+aside ::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+
+aside ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

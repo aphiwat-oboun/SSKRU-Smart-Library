@@ -22,6 +22,8 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
+const MAX_VISIBLE_TOASTS = 5;
+
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
@@ -32,10 +34,14 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const showToast = useCallback(
     (message: string, type: ToastType = 'info') => {
       const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      setToasts((prev) => [...prev, { id, message, type }]);
+      setToasts((prev) => {
+        // Deduplicate identical messages & keep at most MAX_VISIBLE_TOASTS on screen
+        const filtered = prev.filter((t) => !(t.message === message && t.type === type));
+        return [...filtered, { id, message, type }].slice(-MAX_VISIBLE_TOASTS);
+      });
       window.setTimeout(() => {
         dismissToast(id);
-      }, 4200);
+      }, 3200);
     },
     [dismissToast]
   );

@@ -49,6 +49,7 @@ interface AppContextValue {
   isOnline: boolean;
   dashboardData: DashboardSnapshot | null;
   isDashboardLoading: boolean;
+  isRefreshingDashboard: boolean;
   dashboardError: string | null;
   audio: AudioAlertControls;
 
@@ -57,6 +58,11 @@ interface AppContextValue {
   logout: () => void;
   refreshDashboard: (forceSkeleton?: boolean) => Promise<void>;
   acknowledgeAlert: (notificationId: string) => Promise<void>;
+  optimisticUpdateRoom: (
+    roomId: string,
+    updater: (room: DashboardSnapshot['rooms'][number]) => DashboardSnapshot['rooms'][number],
+    activity?: { roomName: string; type: 'SESSION_START' | 'SESSION_END' }
+  ) => () => void;
 
   // Modal States & Triggers
   startSessionTarget: StartSessionModalTarget;
@@ -154,6 +160,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [dashboardData, setDashboardData] = useState<DashboardSnapshot | null>(initialDashboard);
   const [isDashboardLoading, setIsDashboardLoading] = useState<boolean>(!initialDashboard);
+  const [isRefreshingDashboard, setIsRefreshingDashboard] = useState<boolean>(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   const [studentDataVersion, setStudentDataVersion] = useState<number>(0);
@@ -205,6 +212,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (forceSkeleton || !hasDashboardDataRef.current) {
         setIsDashboardLoading(true);
         setDashboardError(null);
+      } else {
+        setIsRefreshingDashboard(true);
       }
       try {
         const snapshot = await apiService.getDashboardSnapshot();
@@ -213,8 +222,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         writeCachedDashboard(snapshot);
         setDashboardError(null);
         setIsDashboardLoading(false);
+        setIsRefreshingDashboard(false);
         checkNewUnreadNotifications(snapshot.unreadNotifications || []);
       } catch (err) {
+        setIsRefreshingDashboard(false);
         if (err instanceof ApiError && err.skipped) {
           return;
         }
@@ -224,6 +235,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     },
     [checkNewUnreadNotifications]
+  );
+
+  /**
+   * Optimistic UI update: mutates local dashboard state + cache in 0ms
+   * and returns a rollback function in case the background API call fails.
+   */
+  const optimisticUpdateRoom = useCallback(
+    (
+      roomId: string,
+      updater: (room: DashboardSnapshot['rooms'][number]) => DashboardSnapshot['rooms'][number],
+      activity?: { roomName: string; type: 'SESSION_START' | 'SESSION_END' }
+    ): (() => void) => {
+      let previousSnapshot: DashboardSnapshot | null = null;
+      setDashboardData((prev) => {
+        previousSnapshot = prev;
+        if (!prev) return prev;
+        const nextRooms = prev.rooms.map((r) => (r.room_id === roomId ? updater(r) : r));
+        const nextActivities = activity
+          ? [
+              {
+                session_id: `OPT-${Date.now()}`,
+                room_id: roomId,
+                room_name: activity.roomName,
+                student_ids: [],
+                timestamp: new Date().toISOString(),
+                session_status: (activity.type === 'SESSION_START' ? 'ACTIVE' : 'COMPLETED') as
+                  | 'ACTIVE'
+                  | 'COMPLETED',
+                end_reason: (activity.type === 'SESSION_END' ? 'NORMAL_CHECKOUT' : '') as
+                  | 'NORMAL_CHECKOUT'
+                  | '',
+                activity_type: activity.type
+              },
+              ...(prev.recentActivities || [])
+            ].slice(0, 10)
+          : prev.recentActivities;
+
+        const next: DashboardSnapshot = {
+          ...prev,
+          serverTime: new Date().toISOString(),
+          rooms: nextRooms,
+          recentActivities: nextActivities
+        };
+        writeCachedDashboard(next);
+        return next;
+      });
+
+      return () => {
+        if (previousSnapshot) {
+          setDashboardData(previousSnapshot);
+          writeCachedDashboard(previousSnapshot);
+        }
+      };
+    },
+    []
   );
 
   // Register global API unauthorized / online status listeners
@@ -274,6 +340,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     if (!currentStaff) return;
 
+    // Warm up secondary page caches silently in the background so switching tabs is 0ms instant!
+    const prefetchTimer = window.setTimeout(() => {
+      void apiService.getStudentsMaster().catch(() => undefined);
+      void apiService.getUsageHistory().catch(() => undefined);
+      void apiService.getNotificationsList().catch(() => undefined);
+      void apiService.getWaitingGroups().catch(() => undefined);
+      void apiService.getIoTOverview().catch(() => undefined);
+      void apiService.getSystemSettings().catch(() => undefined);
+    }, 600);
+
     const dashTimer = window.setInterval(() => {
       if (!document.hidden) {
         void refreshDashboard(false);
@@ -292,6 +368,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 60000);
 
     return () => {
+      window.clearTimeout(prefetchTimer);
       window.clearInterval(dashTimer);
       window.clearInterval(evalTimer);
     };
@@ -433,12 +510,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isOnline,
         dashboardData,
         isDashboardLoading,
+        isRefreshingDashboard,
         dashboardError,
         audio,
         login,
         logout,
         refreshDashboard,
         acknowledgeAlert,
+        optimisticUpdateRoom,
         startSessionTarget,
         openStartSessionModal,
         closeStartSessionModal,

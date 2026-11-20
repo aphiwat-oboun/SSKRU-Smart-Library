@@ -11,7 +11,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { TableRowsSkeleton } from '../components/skeleton/Skeletons';
 import { useAppContext } from '../hooks/useAppContext';
 import { useToast } from '../hooks/useToast';
-import { apiService } from '../services/apiClient';
+import { apiService, getCachedRpc } from '../services/apiClient';
 import { WaitingGroupRecord, WaitingRoomType } from '../types/database';
 import { formatDateTimeThai, formatTimeThai } from '../utils/formatters';
 
@@ -31,13 +31,18 @@ export const WaitingGroupsPage: React.FC = () => {
   } = useAppContext();
   const { showToast } = useToast();
 
-  const [waitingList, setWaitingList] = useState<WaitingGroupRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const cachedWaiting = getCachedRpc<{ waitingGroups: WaitingGroupRecord[] }>('getWaitingGroups');
+  const [waitingList, setWaitingList] = useState<WaitingGroupRecord[]>(
+    cachedWaiting?.waitingGroups || []
+  );
+  const [isLoading, setIsLoading] = useState<boolean>(!cachedWaiting);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('WAITING');
 
   const loadWaitingGroups = useCallback(async () => {
-    setIsLoading(true);
+    if (!getCachedRpc('getWaitingGroups')) {
+      setIsLoading(true);
+    }
     setErrorMsg(null);
     try {
       const res = await apiService.getWaitingGroups();
@@ -87,15 +92,18 @@ export const WaitingGroupsPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 sm:p-6 shadow-sm">
+    <div className="bg-surface border border-line rounded-[24px] p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-[17px] font-bold text-ink">
-            คิวกลุ่มนักศึกษารอใช้ห้อง (Waiting Groups)
-          </h2>
-          <p className="text-[13.5px] text-ink-secondary">
-            ไม่มีระบบจองล่วงหน้า เจ้าหน้าที่เป็นผู้เพิ่มกลุ่มนักศึกษาที่รอใช้ห้องเมื่อห้องเต็ม (ใช้เป็นเงื่อนไขแจ้งเตือนเมื่อมีห้องใช้งานครบ 3 ชั่วโมง)
-          </p>
+        <div className="flex items-stretch gap-3.5">
+          <span className="w-1.5 rounded-full bg-primary shrink-0" />
+          <div>
+            <h1 className="text-[26px] font-bold text-ink leading-tight">
+              คิวกลุ่มนักศึกษารอใช้ห้อง
+            </h1>
+            <p className="text-[15px] text-ink-secondary mt-1">
+              จัดการคิวกลุ่มนักศึกษาที่รอเข้าใช้ห้องประชุมเมื่อห้องเต็ม
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5">

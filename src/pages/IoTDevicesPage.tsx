@@ -10,7 +10,8 @@ import { EmptyState, ErrorState } from '../components/common/StateBoxes';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { TableRowsSkeleton } from '../components/skeleton/Skeletons';
 import { databaseConfig } from '../config/database';
-import { apiService } from '../services/apiClient';
+import { apiService, getCachedRpc } from '../services/apiClient';
+import { IoTOverviewResponse } from '../types/api';
 import { IoTDeviceRecord, IoTEventRecord } from '../types/database';
 import { formatDateTimeThai } from '../utils/formatters';
 
@@ -26,13 +27,16 @@ function isDemoSource(value: string): boolean {
 }
 
 export const IoTDevicesPage: React.FC = () => {
-  const [devices, setDevices] = useState<IoTDeviceRecord[]>([]);
-  const [events, setEvents] = useState<IoTEventRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const cachedIoT = getCachedRpc<IoTOverviewResponse>('getIoTOverview');
+  const [devices, setDevices] = useState<IoTDeviceRecord[]>(cachedIoT?.devices || []);
+  const [events, setEvents] = useState<IoTEventRecord[]>(cachedIoT?.events || []);
+  const [isLoading, setIsLoading] = useState<boolean>(!cachedIoT);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const loadIoT = useCallback(async () => {
-    setIsLoading(true);
+    if (!getCachedRpc('getIoTOverview')) {
+      setIsLoading(true);
+    }
     setErrorMsg(null);
     try {
       const res = await apiService.getIoTOverview();
@@ -52,26 +56,29 @@ export const IoTDevicesPage: React.FC = () => {
   }, [loadIoT]);
 
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-6">
+    <div className="bg-surface border border-line rounded-[24px] p-6 shadow-sm space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <h2 className="text-[17px] font-bold text-ink">
-              จัดการอุปกรณ์ตรวจจับการมีคน (ESP32 + mmWave LD2410)
-            </h2>
-            {databaseConfig.mode === 'gas' || databaseConfig.mode === 'api' ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                ● เชื่อมต่อฐานข้อมูลจริง ({databaseConfig.mode === 'gas' ? 'Google Sheets' : 'API'})
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                ● โหมดจำลองในเครื่อง (Local Demo)
-              </span>
-            )}
+        <div className="flex items-stretch gap-3.5">
+          <span className="w-1.5 rounded-full bg-primary shrink-0" />
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-[24px] font-bold text-ink leading-tight">
+                จัดการอุปกรณ์เซนเซอร์ IoT (ESP32 + LD2410C)
+              </h1>
+              {databaseConfig.mode === 'gas' || databaseConfig.mode === 'api' ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ● เชื่อมต่อฐานข้อมูลจริง ({databaseConfig.mode === 'gas' ? 'Google Sheets' : 'API'})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  ● โหมดจำลองในเครื่อง (Local Demo)
+                </span>
+              )}
+            </div>
+            <p className="text-[15px] text-ink-secondary">
+              ตรวจสอบสถานะการเชื่อมต่อ แหล่งที่มาของข้อมูล (ข้อมูลจริง / Wokwi Demo) และประวัติสัญญาณตรวจจับคน
+            </p>
           </div>
-          <p className="text-[13.5px] text-ink-secondary">
-            ตรวจสอบสถานะ Online/Offline, เวลาติดต่อล่าสุด (Last Seen), แหล่งที่มาของข้อมูล (ข้อมูลจริง / Wokwi Demo) และประวัติสัญญาณตรวจจับคน
-          </p>
         </div>
 
         <button

@@ -31,10 +31,13 @@ export function formatDateTimeThai(isoStr?: string | null): string {
 }
 
 export function formatDurationHoursMinutes(seconds?: number | null): string {
-  const sec = Number(seconds) || 0;
-  if (sec <= 0) return '00:00 ชม.';
+  const sec = Math.max(0, Math.round(Number(seconds) || 0));
+  if (sec <= 0) return '0 นาที';
+  if (sec < 60) return `${sec} วินาที`;
   const totalMinutes = Math.floor(sec / 60);
   const hrs = Math.floor(totalMinutes / 60);
   const mins = totalMinutes % 60;
-  return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')} ชม.`;
+  if (hrs === 0) return `${mins} นาที`;
+  if (mins === 0) return `${hrs} ชม.`;
+  return `${hrs} ชม. ${mins} นาที`;
 }

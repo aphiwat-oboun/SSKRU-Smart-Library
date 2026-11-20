@@ -79,6 +79,44 @@ export class ApiError extends Error {
 
 const AUTH_TOKEN_KEY = 'SRRU_LIB_AUTH_TOKEN';
 const inFlightPromises = new Map<string, Promise<unknown>>();
+const rpcMemoryCache = new Map<string, unknown>();
+
+const CACHEABLE_READ_ACTIONS = new Set<RpcAction>([
+  'getDashboardSnapshot',
+  'getStudentsMaster',
+  'getUsageHistory',
+  'getWaitingGroups',
+  'getNotificationsList',
+  'getIoTOverview',
+  'getSystemSettings'
+]);
+
+export function getCachedRpc<TData>(action: RpcAction): TData | null {
+  if (rpcMemoryCache.has(action)) {
+    return rpcMemoryCache.get(action) as TData;
+  }
+  try {
+    const raw = sessionStorage.getItem(`SRRU_RPC_CACHE_${action}`);
+    if (raw) {
+      const parsed = JSON.parse(raw) as TData;
+      rpcMemoryCache.set(action, parsed);
+      return parsed;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return null;
+}
+
+function writeCachedRpc(action: RpcAction, data: unknown): void {
+  if (!CACHEABLE_READ_ACTIONS.has(action)) return;
+  rpcMemoryCache.set(action, data);
+  try {
+    sessionStorage.setItem(`SRRU_RPC_CACHE_${action}`, JSON.stringify(data));
+  } catch {
+    // Ignore quota errors
+  }
+}
 
 type UnauthorizedListener = () => void;
 type OnlineStatusListener = (online: boolean) => void;
@@ -234,11 +272,16 @@ export async function callRpc<TData, TPayload extends Record<string, unknown> = 
     throw new ApiError('ไม่พบการเชื่อมต่อ Google Apps Script Backend', 'NO_BACKEND_TRANSPORT');
   };
 
-  const promise = execute().finally(() => {
-    if (lockKey) {
-      inFlightPromises.delete(lockKey);
-    }
-  });
+  const promise = execute()
+    .then((data) => {
+      writeCachedRpc(action, data);
+      return data;
+    })
+    .finally(() => {
+      if (lockKey) {
+        inFlightPromises.delete(lockKey);
+      }
+    });
 
   if (lockKey) {
     inFlightPromises.set(lockKey, promise);
@@ -274,6 +317,16 @@ export const apiService = {
 
   setRoomStatus(roomId: string, status: RoomStatus): Promise<RoomSnapshot> {
     return callRpc<RoomSnapshot>('setRoomStatus', { room_id: roomId, status }, `set_room_${roomId}`);
+  },
+
+  createRoom(payload: {
+    room_name: string;
+    floor_id: 'FL3' | 'FL5';
+    description?: string;
+    capacity: number;
+    device_id?: string;
+  }): Promise<RoomSnapshot> {
+    return callRpc<RoomSnapshot>('createRoom', payload, 'create_room');
   },
 
   getStudentsMaster(): Promise<{ students: StudentMasterRecord[] }> {

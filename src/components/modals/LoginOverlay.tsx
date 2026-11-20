@@ -5,7 +5,7 @@
  */
 
 import React, { useState } from 'react';
-import { BookOpen, Lock, User } from 'lucide-react';
+import { Lock, User } from 'lucide-react';
 import { useAppContext } from '../../hooks/useAppContext';
 
 export const LoginOverlay: React.FC = () => {
@@ -48,9 +48,11 @@ export const LoginOverlay: React.FC = () => {
     >
       <div className="bg-surface rounded-3xl w-full max-w-[440px] p-8 sm:p-9 shadow-xl border border-line">
         <div className="text-center mb-7">
-          <div className="w-16 h-16 rounded-2xl bg-primary text-white inline-flex items-center justify-center mb-4">
-            <BookOpen className="w-8 h-8" />
-          </div>
+          <img
+            src="./sskru-logo.png"
+            alt="ตราประจำมหาวิทยาลัยราชภัฏศรีสะเกษ"
+            className="w-20 h-20 mx-auto mb-3 object-contain"
+          />
           <h2 id="loginDialogTitle" className="text-2xl font-bold text-ink">
             ห้องสมุด มรภ.ศรีสะเกษ
           </h2>

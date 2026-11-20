@@ -11,7 +11,7 @@ import { EmptyState, ErrorState } from '../components/common/StateBoxes';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { TableRowsSkeleton } from '../components/skeleton/Skeletons';
 import { useAppContext } from '../hooks/useAppContext';
-import { apiService } from '../services/apiClient';
+import { apiService, getCachedRpc } from '../services/apiClient';
 import { StudentMasterRecord } from '../types/database';
 
 export const StudentsPage: React.FC = () => {
@@ -21,8 +21,9 @@ export const StudentsPage: React.FC = () => {
     studentDataVersion
   } = useAppContext();
 
-  const [students, setStudents] = useState<StudentMasterRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const cachedStudents = getCachedRpc<{ students: StudentMasterRecord[] }>('getStudentsMaster');
+  const [students, setStudents] = useState<StudentMasterRecord[]>(cachedStudents?.students || []);
+  const [isLoading, setIsLoading] = useState<boolean>(!cachedStudents);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Filters
@@ -33,7 +34,9 @@ export const StudentsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
 
   const loadStudents = useCallback(async () => {
-    setIsLoading(true);
+    if (!getCachedRpc('getStudentsMaster')) {
+      setIsLoading(true);
+    }
     setErrorMsg(null);
     try {
       const res = await apiService.getStudentsMaster();
@@ -95,22 +98,25 @@ export const StudentsPage: React.FC = () => {
   ]);
 
   return (
-    <div className="bg-surface border border-line rounded-2xl p-5 sm:p-6 shadow-sm">
+    <div className="bg-surface border border-line rounded-[20px] p-6 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-        <div>
-          <h2 className="text-[17px] font-bold text-ink">
-            ระบบจัดการข้อมูลนักศึกษาและบัตร RFID (Master Data)
-          </h2>
-          <p className="text-[13.5px] text-ink-secondary">
-            ค้นหาด้วยรหัสนักศึกษา/ชื่อ กรองตามชั้นปี คณะ สาขา ตรวจสอบสถานะบัตร และดูประวัติการใช้ห้องรายบุคคล
-          </p>
+        <div className="flex items-stretch gap-3.5">
+          <span className="w-1.5 rounded-full bg-primary shrink-0" />
+          <div>
+            <h1 className="text-[26px] font-bold text-ink leading-tight">
+              ข้อมูลนักศึกษา ({students.length} คน)
+            </h1>
+            <p className="text-[15px] text-ink-secondary mt-1">
+              ค้นหาด้วยรหัส ชื่อ ชั้นปี คณะ หรือสาขาวิชา และคลิกเพื่อดูประวัติการใช้ห้องรายบุคคล
+            </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => void loadStudents()}
-            className="h-10 px-3.5 rounded-lg border border-line-strong bg-surface text-sm font-semibold text-ink hover:bg-subtle inline-flex items-center gap-1.5"
+            className="h-11 px-4 rounded-xl border border-line-strong bg-surface text-[15px] font-bold text-ink hover:bg-subtle inline-flex items-center gap-2"
           >
             <RefreshCw className="w-4 h-4" />
             <span>รีเฟรช</span>
@@ -118,10 +124,10 @@ export const StudentsPage: React.FC = () => {
           <button
             type="button"
             onClick={openRegisterStudentModal}
-            className="h-10 px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-hover inline-flex items-center gap-2"
+            className="h-11 px-5 rounded-xl bg-primary text-white text-[15px] font-bold hover:bg-primary-hover inline-flex items-center gap-2"
           >
             <UserPlus className="w-4 h-4" />
-            <span>ลงทะเบียนนักศึกษา / ผูกบัตรใหม่</span>
+            <span>ลงทะเบียนนักศึกษาใหม่</span>
           </button>
         </div>
       </div>
@@ -216,15 +222,14 @@ export const StudentsPage: React.FC = () => {
 
       {!isLoading && !errorMsg && filteredStudents.length > 0 && (
         <div className="w-full overflow-x-auto border border-line rounded-xl">
-          <table className="w-full border-collapse text-left text-sm">
+          <table className="w-full border-collapse text-left text-[15px]">
             <thead>
-              <tr className="bg-subtle text-ink-secondary text-[13px] font-semibold border-b border-line">
+              <tr className="bg-subtle text-ink-secondary text-[14px] font-bold border-b border-line">
                 <th className="px-4 py-3 whitespace-nowrap">รหัสนักศึกษา</th>
                 <th className="px-4 py-3 whitespace-nowrap">ชื่อ-นามสกุล</th>
-                <th className="px-4 py-3 whitespace-nowrap">ชั้นปี / ปีที่เข้า</th>
+                <th className="px-4 py-3 whitespace-nowrap">ชั้นปี</th>
                 <th className="px-4 py-3">คณะ / สาขาวิชา</th>
-                <th className="px-4 py-3 whitespace-nowrap">สถานะนักศึกษา</th>
-                <th className="px-4 py-3 whitespace-nowrap">บัตรนักศึกษา (UID)</th>
+                <th className="px-4 py-3 whitespace-nowrap">สถานะ</th>
                 <th className="px-4 py-3 whitespace-nowrap">การจัดการ</th>
               </tr>
             </thead>
@@ -232,18 +237,18 @@ export const StudentsPage: React.FC = () => {
               {filteredStudents.slice(0, 100).map((s) => (
                 <tr
                   key={s.student_id}
-                  className="border-b border-line last:border-b-0 hover:bg-slate-50"
+                  className="border-b border-line last:border-b-0 hover:bg-subtle/60"
                 >
                   <td className="px-4 py-3.5 font-bold text-ink">
                     {s.student_id}
                   </td>
-                  <td className="px-4 py-3.5 text-ink">{s.student_name}</td>
-                  <td className="px-4 py-3.5 text-ink">
-                    ชั้นปีที่ {s.student_year} (รหัสปี {s.admission_year})
+                  <td className="px-4 py-3.5 font-semibold text-ink">{s.student_name}</td>
+                  <td className="px-4 py-3.5 text-ink whitespace-nowrap">
+                    ชั้นปีที่ {s.student_year}
                   </td>
                   <td className="px-4 py-3.5">
                     <div className="text-ink font-medium">{s.faculty_name}</div>
-                    <div className="text-xs text-ink-secondary">
+                    <div className="text-[13.5px] text-ink-secondary">
                       {s.major_name}
                     </div>
                   </td>
@@ -254,31 +259,16 @@ export const StudentsPage: React.FC = () => {
                           ? 'OCCUPIED'
                           : 'DEVICE_OFFLINE'
                       }
-                      customLabel={s.student_status}
+                      customLabel={s.student_status === 'ACTIVE' ? 'กำลังศึกษา' : s.student_status}
                     />
-                  </td>
-                  <td className="px-4 py-3.5">
-                    {s.card_uid ? (
-                      <StatusBadge
-                        status={
-                          s.card_status === 'ACTIVE' ? 'OCCUPIED' : 'WARNING'
-                        }
-                        customLabel={`${s.card_uid} (${s.card_status})`}
-                      />
-                    ) : (
-                      <StatusBadge
-                        status="AVAILABLE"
-                        customLabel="ยังไม่ผูกบัตร"
-                      />
-                    )}
                   </td>
                   <td className="px-4 py-3.5">
                     <button
                       type="button"
                       onClick={() => openStudentDetailModal(s.student_id)}
-                      className="h-8 px-3 rounded-lg border border-line-strong bg-surface text-xs font-semibold text-ink hover:bg-subtle"
+                      className="h-9 px-4 rounded-xl border border-line-strong bg-surface text-[14px] font-bold text-primary hover:bg-primary-light"
                     >
-                      ดูรายละเอียด / ประวัติ
+                      ดูประวัติ
                     </button>
                   </td>
                 </tr>

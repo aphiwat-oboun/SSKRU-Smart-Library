@@ -34,6 +34,7 @@ export type RpcAction =
   | 'getDashboardSnapshot'
   | 'getRoomDetail'
   | 'setRoomStatus'
+  | 'createRoom'
   | 'getStudentsMaster'
   | 'registerStudentAndCard'
   | 'verifyStudentCardForSession'

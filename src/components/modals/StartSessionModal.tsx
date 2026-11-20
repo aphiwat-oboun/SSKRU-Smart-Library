@@ -13,6 +13,7 @@ import { apiService } from '../../services/apiClient';
 import { VerifiedStudentCard } from '../../types/api';
 import { formatTimeThai } from '../../utils/formatters';
 import { generateIdempotencyKey } from '../../utils/idempotency';
+import { LIBRARY_CLOSING_LABEL } from '../../utils/libraryHours';
 
 export const StartSessionModal: React.FC = () => {
   const {
@@ -20,6 +21,7 @@ export const StartSessionModal: React.FC = () => {
     closeStartSessionModal,
     dashboardData,
     refreshDashboard,
+    optimisticUpdateRoom,
     openRegisterStudentModal,
     bumpWaitingDataVersion
   } = useAppContext();
@@ -129,36 +131,63 @@ export const StartSessionModal: React.FC = () => {
     Boolean(selectedRoomId) &&
     !isSubmittingSession;
 
-  const handleConfirmStartSession = async () => {
+  const handleConfirmStartSession = () => {
     if (!canConfirm) return;
 
-    setIsSubmittingSession(true);
-    try {
-      const res = await apiService.startRoomSession({
-        room_id: selectedRoomId,
-        waiting_id: startSessionTarget.waitingGroup?.waiting_id || '',
-        idempotency_key: idempotencyKey,
-        members: scannedStudents.map((s) => ({
-          student_id: s.student_id,
-          card_id: s.card_id,
-          card_uid: s.card_uid
-        }))
-      });
+    const targetRoom = availableRooms.find((r) => r.room_id === selectedRoomId);
+    const targetRoomName = targetRoom?.room_name || selectedRoomId;
+    const nowIso = new Date().toISOString();
+    const expectedEndIso = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+    const membersPayload = scannedStudents.map((s) => ({
+      student_id: s.student_id,
+      card_id: s.card_id,
+      card_uid: s.card_uid
+    }));
+    const waitingId = startSessionTarget.waitingGroup?.waiting_id || '';
+    const hadWaiting = Boolean(startSessionTarget.waitingGroup);
+    const reqKey = idempotencyKey;
 
-      closeStartSessionModal();
-      showToast(`ให้กุญแจ ${res.room_name} และเริ่มจับเวลาเรียบร้อยแล้ว`, 'success');
-      if (startSessionTarget.waitingGroup) {
-        bumpWaitingDataVersion();
-      }
-      await refreshDashboard(false);
-    } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : 'ไม่สามารถเริ่มใช้งานห้องได้',
-        'error'
-      );
-    } finally {
-      setIsSubmittingSession(false);
-    }
+    // 1. Optimistic 0ms UI update: close modal & flip room to OCCUPIED immediately!
+    const rollback = optimisticUpdateRoom(
+      selectedRoomId,
+      (r) => ({
+        ...r,
+        room_status: 'OCCUPIED',
+        effective_status: 'OCCUPIED',
+        current_session_id: `PENDING-${Date.now()}`,
+        session_start_time: nowIso,
+        expected_end_time: expectedEndIso,
+        elapsed_seconds: 0,
+        active_member_count: membersPayload.length,
+        has_entered: true,
+        presence_state: 'PRESENT'
+      }),
+      { roomName: targetRoomName, type: 'SESSION_START' }
+    );
+    closeStartSessionModal();
+    showToast(`ให้กุญแจ ${targetRoomName} และเริ่มจับเวลาเรียบร้อยแล้ว`, 'success');
+
+    // 2. Sync to Google Sheets in the background
+    apiService
+      .startRoomSession({
+        room_id: selectedRoomId,
+        waiting_id: waitingId,
+        idempotency_key: reqKey,
+        members: membersPayload
+      })
+      .then(() => {
+        if (hadWaiting) {
+          bumpWaitingDataVersion();
+        }
+        void refreshDashboard(false);
+      })
+      .catch((err) => {
+        rollback();
+        showToast(
+          err instanceof Error ? err.message : 'ไม่สามารถเริ่มใช้งานห้องได้',
+          'error'
+        );
+      });
   };
 
   return (
@@ -312,7 +341,7 @@ export const StartSessionModal: React.FC = () => {
               ใช้ได้ 3 ชั่วโมง <span className="font-normal">(ถึง {expectedEndShort})</span>
             </div>
             <div className="text-[#2D6247] text-[14px] mt-0.5">
-              ถ้าไม่มีคิวรอ ใช้ต่อได้จนห้องสมุดปิด 20:00
+              ถ้าไม่มีคิวรอ ใช้ต่อได้จนห้องสมุดปิด {LIBRARY_CLOSING_LABEL}
             </div>
           </div>
 

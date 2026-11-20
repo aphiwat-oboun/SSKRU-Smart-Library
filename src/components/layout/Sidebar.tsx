@@ -9,7 +9,6 @@ import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
   Bell,
-  BookOpen,
   Clock,
   Cpu,
   DoorOpen,
@@ -131,18 +130,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen, onCloseMobile })
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
-        {/* Brand Header with Emblem */}
+        {/* Brand Header with Official SSKRU Logo */}
         <div className="px-5 pt-6 pb-5 border-b border-white/10 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/20 flex items-center justify-center text-[#6EE7B7] shrink-0 shadow-inner">
-              <BookOpen className="w-6 h-6" />
-            </div>
+            <img
+              src="./sskru-logo.png"
+              alt="ตราประจำมหาวิทยาลัยราชภัฏศรีสะเกษ"
+              className="w-12 h-12 rounded-2xl bg-white p-1 object-contain shadow-sm shrink-0"
+            />
             <div className="min-w-0">
               <div className="text-[11.5px] text-[#9BC9AE] font-medium truncate">
                 ห้องสมุด มรภ.ศรีสะเกษ
               </div>
               <div className="text-[20px] font-bold text-white leading-tight tracking-tight truncate">
-                SRRU Library
+                SSKRU Library
               </div>
             </div>
           </div>
